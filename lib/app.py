@@ -22,6 +22,14 @@ try:
 except ImportError:
     HAS_REQUESTS = False
 
+# Hide dock icon — menu bar only
+try:
+    import AppKit
+    info = AppKit.NSBundle.mainBundle().infoDictionary()
+    info["LSUIElement"] = "1"
+except Exception:
+    pass
+
 CLAUDE_DIR = Path.home() / ".claude"
 REFRESH_INTERVAL = 60
 SESSION_WINDOW_HOURS = 5
