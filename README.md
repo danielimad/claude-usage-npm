@@ -25,7 +25,7 @@ A signed, notarized SwiftUI menu-bar app + full dashboard window.
 Download the latest `.dmg` from [`macos/`](./macos/), open it, drag **Claude Usage Bar.app** to Applications, and launch it. The first launch shows a Welcome screen — enter your claude.ai email and sign in.
 
 ```
-macos/ClaudeUsageBar-0.2.7.dmg
+macos/ClaudeUsageBar-0.2.8.dmg
 ```
 
 The DMG is signed with a Developer ID certificate and notarized by Apple, so it opens cleanly without Gatekeeper warnings.
