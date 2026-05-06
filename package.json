@@ -1,0 +1,22 @@
+{
+  "name": "claude-usage",
+  "version": "0.1.0",
+  "description": "Claude Code usage in your Mac menu bar",
+  "keywords": ["claude", "anthropic", "claude-code", "menu-bar", "usage"],
+  "homepage": "https://github.com/danielimad/claude-usage-bar",
+  "bugs": "https://github.com/danielimad/claude-usage-bar/issues",
+  "license": "MIT",
+  "preferGlobal": true,
+  "bin": {
+    "claude-usage": "./bin/claude-usage.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16"
+  }
+}
