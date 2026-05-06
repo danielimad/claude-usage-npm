@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "description": "Claude Code usage in your Mac menu bar",
   "keywords": ["claude", "anthropic", "claude-code", "menu-bar", "usage"],
-  "homepage": "https://github.com/danielimad/claude-usage-bar",
-  "bugs": "https://github.com/danielimad/claude-usage-bar/issues",
+  "homepage": "https://github.com/danielimad/claude-usage-npm",
+  "bugs": "https://github.com/danielimad/claude-usage-npm/issues",
   "license": "MIT",
   "preferGlobal": true,
   "bin": {
