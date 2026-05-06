@@ -1,0 +1,38 @@
+# Documentation (kept local only — not committed)
+docs/
+
+# Node
+node_modules/
+*.log
+.npm/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# Build artifacts (Swift project lives in a sibling repo, but cover anyway)
+.build/
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Local testing
+*.local
+.env
+.env.*
