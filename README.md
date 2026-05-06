@@ -9,7 +9,7 @@
 ## Install
 
 ```bash
-npx claude-usage install
+npx claude-usage-bar install
 ```
 
 That's it. `☁ 25%` appears in your menu bar immediately and **auto-starts on every login and reboot** — no manual steps ever again.
@@ -17,7 +17,7 @@ That's it. `☁ 25%` appears in your menu bar immediately and **auto-starts on e
 ## Commands
 
 ```bash
-npx claude-usage install     # install + start (first time)
+npx claude-usage-bar install     # install + start (first time)
 claude-usage install         # same, if installed globally
 
 claude-usage start           # start the menu bar app

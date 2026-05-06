@@ -1,5 +1,5 @@
 {
-  "name": "claude-usage",
+  "name": "claude-usage-bar",
   "version": "0.1.0",
   "description": "Claude Code usage in your Mac menu bar",
   "keywords": ["claude", "anthropic", "claude-code", "menu-bar", "usage"],
@@ -8,7 +8,7 @@
   "license": "MIT",
   "preferGlobal": true,
   "bin": {
-    "claude-usage": "./bin/claude-usage.js"
+    "claude-usage-bar": "./bin/claude-usage-bar.js"
   },
   "files": [
     "bin/",
