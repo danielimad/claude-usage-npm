@@ -36,3 +36,4 @@ DerivedData/
 *.local
 .env
 .env.*
+claude-usage-bar-mac
