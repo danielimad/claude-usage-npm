@@ -50,55 +50,99 @@ def fmt_time(dt):
 def get_oauth_token():
     """
     Auto-discover the Claude Code OAuth token from macOS Keychain.
-    Claude Code stores credentials as:
-      service = "Claude Code-credentials"
-      account = <system username>
-      value   = JSON: {"claudeAiOauth": {"accessToken": "sk-ant-oat01-..."}}
+
+    Strategy (in order):
+    1. Read "Claude Code-credentials" without specifying account — works regardless
+       of what username Claude Code used when it stored the token (the #1 failure
+       cause on fresh Macs where the stored account differs from current user).
+    2. Read same service with current username as fallback.
+    3. Check "com.amirhayek.ClaudeUsage.oauth-cache" — the 'Usage for Claude' app
+       caches a validated token here; reuse it if present.
+    4. Check credential JSON files on disk.
+
+    Token expiry: if expiresAt is in the past by more than 5 min, attempt a
+    silent refresh by invoking the Claude CLI (which updates the keychain), then
+    re-read once.
     """
+    token, expires_at = _read_best_token()
+
+    if token and expires_at:
+        now_ms = datetime.now(timezone.utc).timestamp() * 1000
+        # Token expired — try a silent refresh via Claude CLI
+        if now_ms > expires_at + 5 * 60 * 1000:
+            _try_silent_refresh()
+            token, expires_at = _read_best_token()
+
+    return token
+
+
+def _read_best_token():
+    """Return (access_token, expires_at_ms) from the best available source."""
     username = pwd.getpwuid(os.getuid()).pw_name
 
-    keychain_candidates = [
-        ("Claude Code-credentials", username),
-        ("Claude Code-credentials", ""),
-        ("Claude Safe Storage",     "Claude Key"),
-        ("claude.ai",               ""),
-        ("Claude",                  ""),
-        ("anthropic",               ""),
-    ]
+    # Primary: "Claude Code-credentials" — try without account first, then with
+    for account in [None, username, ""]:
+        raw = _keychain_read("Claude Code-credentials", account)
+        if raw:
+            tok, exp = _extract_oauth_token(raw)
+            if tok:
+                return tok, exp
 
-    for service, account in keychain_candidates:
-        raw = _keychain_read(service, account)
-        if not raw:
-            continue
-        # Try JSON blob first (Claude Code's format)
-        try:
-            blob = json.loads(raw)
-            for val in _flatten_values(blob):
-                if isinstance(val, str) and _looks_like_token(val):
-                    return val
-        except Exception:
-            pass
-        # Try raw string
-        if _looks_like_token(raw):
-            return raw
+    # Secondary: 'Usage for Claude' app oauth cache
+    raw = _keychain_read("com.amirhayek.ClaudeUsage.oauth-cache", "claude_code_token")
+    if raw:
+        tok, exp = _extract_oauth_token(raw)
+        if tok:
+            return tok, exp
 
-    # Fallback: credential files
+    # Tertiary: credential files on disk
     for p in [
         CLAUDE_DIR / ".credentials.json",
         CLAUDE_DIR / "credentials.json",
         Path.home() / "Library/Application Support/Claude/credentials.json",
     ]:
-        token = _token_from_json_file(p)
-        if token:
-            return token
+        tok, exp = _token_from_json_file(p)
+        if tok:
+            return tok, exp
 
-    return None
+    return None, None
+
+
+def _extract_oauth_token(raw):
+    """Parse a raw keychain string and return (access_token, expires_at_ms)."""
+    try:
+        blob = json.loads(raw)
+        oauth = blob.get("claudeAiOauth", {})
+        token = oauth.get("accessToken", "")
+        expires = oauth.get("expiresAt")  # milliseconds epoch
+        if token and _looks_like_token(token):
+            return token, expires
+        # Fallback: walk all values
+        for val in _flatten_values(blob):
+            if isinstance(val, str) and _looks_like_token(val):
+                return val, None
+    except Exception:
+        pass
+    if _looks_like_token(raw):
+        return raw, None
+    return None, None
+
+
+def _try_silent_refresh():
+    """Ask the Claude CLI to run a no-op so it refreshes the keychain token."""
+    try:
+        subprocess.run(
+            ["claude", "--version"],
+            capture_output=True, timeout=10,
+        )
+    except Exception:
+        pass
 
 
 def _keychain_read(service, account):
     try:
         cmd = ["security", "find-generic-password", "-s", service, "-w"]
-        if account:
+        if account is not None and account != "":
             cmd += ["-a", account]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
         val = r.stdout.strip()
@@ -110,12 +154,17 @@ def _keychain_read(service, account):
 def _token_from_json_file(path):
     try:
         data = json.loads(Path(path).read_text())
+        oauth = data.get("claudeAiOauth", {})
+        token = oauth.get("accessToken", "")
+        expires = oauth.get("expiresAt")
+        if token and _looks_like_token(token):
+            return token, expires
         for val in _flatten_values(data):
             if isinstance(val, str) and _looks_like_token(val):
-                return val
+                return val, None
     except Exception:
         pass
-    return None
+    return None, None
 
 
 def _flatten_values(obj, depth=0):
@@ -367,13 +416,22 @@ class ClaudeUsageApp(rumps.App):
 
     def show_debug(self, _):
         username = pwd.getpwuid(os.getuid()).pw_name
-        raw = _keychain_read("Claude Code-credentials", username) or "NOT FOUND"
-        token = get_oauth_token()
+        # Try all sources for debug visibility
+        raw_no_acct = _keychain_read("Claude Code-credentials", None) or "NOT FOUND"
+        raw_with_acct = _keychain_read("Claude Code-credentials", username) or "NOT FOUND"
+        token, expires_at = _read_best_token()
+        exp_str = ""
+        if expires_at:
+            try:
+                exp_str = datetime.fromtimestamp(expires_at / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            except Exception:
+                exp_str = str(expires_at)
         msg = (
-            f"Keychain 'Claude Code-credentials' ({username}):\n"
-            f"  {len(raw)} chars: {raw[:60]}…\n\n"
-            f"Token extracted: {'YES — ' + str(len(token)) + ' chars' if token else 'NO'}\n"
-            f"Token preview: {token[:20] + '…' if token else '—'}\n\n"
+            f"Keychain (no account): {len(raw_no_acct)} chars\n"
+            f"Keychain ({username}): {len(raw_with_acct)} chars\n\n"
+            f"Token found: {'YES — ' + str(len(token)) + ' chars' if token else 'NO'}\n"
+            f"Token preview: {token[:25] + '…' if token else '—'}\n"
+            f"Token expires: {exp_str or '—'}\n\n"
             f"API error: {self.error or 'none'}\n\n"
             f"Raw API response:\n{json.dumps(self.live.get('raw') if self.live else {}, indent=2)[:500]}"
         )
